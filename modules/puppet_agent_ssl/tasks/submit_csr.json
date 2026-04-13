@@ -1,0 +1,13 @@
+{
+  "description": "Generate a new SSL keypair and submit a certificate signing request to the CA.",
+  "parameters": {
+    "agent_binary": {
+      "type": "Optional[String[1]]",
+      "description": "Path or name of the agent binary. Defaults to 'puppet'."
+    }
+  },
+  "implementations": [
+    { "name": "submit_csr.sh",  "requirements": ["shell"] },
+    { "name": "submit_csr.ps1", "requirements": ["powershell"] }
+  ]
+}

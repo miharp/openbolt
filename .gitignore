@@ -56,6 +56,7 @@ modules/*
 !modules/aggregate
 !modules/canary
 !modules/puppetdb_fact
+!modules/puppet_agent_ssl
 
 .sass-cache/
 locales/
@@ -72,6 +73,10 @@ documentation/bolt_types_reference.md
 documentation/packaged_modules.md
 tasks/
 plans/
+!modules/puppet_agent_ssl/tasks/
+!modules/puppet_agent_ssl/tasks/**
+!modules/puppet_agent_ssl/plans/
+!modules/puppet_agent_ssl/plans/**
 
 pwsh_module/PuppetBolt.psm1
 pwsh_module/PuppetBolt.psd1

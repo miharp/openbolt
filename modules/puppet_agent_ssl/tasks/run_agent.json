@@ -1,0 +1,17 @@
+{
+  "description": "Run the Puppet/openvox agent once and return the exit code.",
+  "parameters": {
+    "agent_binary": {
+      "type": "Optional[String[1]]",
+      "description": "Path or name of the agent binary. Defaults to 'puppet'."
+    },
+    "noop": {
+      "type": "Optional[Boolean]",
+      "description": "Run the agent in noop mode. Defaults to false."
+    }
+  },
+  "implementations": [
+    { "name": "run_agent.sh",  "requirements": ["shell"] },
+    { "name": "run_agent.ps1", "requirements": ["powershell"] }
+  ]
+}
