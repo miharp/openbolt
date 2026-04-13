@@ -45,10 +45,28 @@ plan puppet_agent_ssl::regenerate(
 
   # ------------------------------------------------------------------
   # Step 1: Collect certnames before touching any SSL state.
+  # Also collect the CA's own certname and fail early if any agent is
+  # the CA server — regenerating the CA's certificate via this plan
+  # would break puppetserver while it is running.
   # ------------------------------------------------------------------
   $certname_results = run_task('puppet_agent_ssl::get_certname', $agents,
     agent_binary => $agent_binary,
   )
+
+  $ca_certname = run_task('puppet_agent_ssl::get_certname', $ca,
+    agent_binary => $agent_binary,
+  )[0]['certname']
+
+  $ca_targets = $certname_results.filter |$r| { $r['certname'] == $ca_certname }
+  if $ca_targets.length > 0 {
+    $names = $ca_targets.map |$r| { $r.target().name }.join(', ')
+    fail_plan(
+      "Refusing to regenerate the CA server's own certificate (${ca_certname}). \
+Use a dedicated CA cert regeneration procedure instead. Affected targets: ${names}",
+      'puppet_agent_ssl/ca-target-not-supported',
+      { targets => $names }
+    )
+  }
 
   # ------------------------------------------------------------------
   # Step 2: Stop the agent service so it does not interfere.
