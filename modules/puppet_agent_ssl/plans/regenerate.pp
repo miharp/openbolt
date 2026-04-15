@@ -68,15 +68,16 @@ Use a dedicated CA cert regeneration procedure instead. Affected targets: ${name
 
   # Clean local SSL on all agents in parallel, then revoke each cert on the CA.
   # CA clean is best-effort — the cert may not exist on a re-bootstrapped node.
+  $certnames = $certname_results.map |$r| { $r['certname'] }.join(',')
+
   run_command("${agent_binary} ssl clean", $agents)
 
-  $certname_results.each |$result| {
-    $certname = $result['certname']
-    out::message("Revoking old certificate for ${certname}")
-    run_command("puppetserver ca clean --certname ${certname}", $ca,
-      { '_catch_errors' => true }
-    )
-  }
+  # Revoke all old certificates in a single CA round-trip.
+  # Best-effort — certs may not exist on re-bootstrapped nodes.
+  out::message("Revoking old certificates on CA: ${certnames}")
+  run_command("puppetserver ca clean --certname ${certnames}", $ca,
+    { '_catch_errors' => true }
+  )
 
   # submit_request exits non-zero when the cert is not yet signed — expected.
   run_task('puppet_agent_ssl::submit_csr', $agents,
@@ -84,15 +85,13 @@ Use a dedicated CA cert regeneration procedure instead. Affected targets: ${name
     _catch_errors => true,
   )
 
-  $certname_results.each |$result| {
-    $certname = $result['certname']
-    out::message("Signing certificate for ${certname}")
-    # Autosign environments will have already signed the cert by the time
-    # submit_csr returns; the final agent run confirms success either way.
-    run_command("puppetserver ca sign --certname ${certname}", $ca,
-      { '_catch_errors' => true }
-    )
-  }
+  # Sign all new certificates in a single CA round-trip.
+  # Autosign environments will have already signed the certs by the time
+  # submit_csr returns; the final agent run confirms success either way.
+  out::message("Signing certificates on CA: ${certnames}")
+  run_command("puppetserver ca sign --certname ${certnames}", $ca,
+    { '_catch_errors' => true }
+  )
 
   $final_results = run_task('puppet_agent_ssl::run_agent', $agents,
     agent_binary  => $agent_binary,

@@ -17,6 +17,16 @@ The plan is designed to run from the Puppet/OpenVox CA server so that CA operati
 
 This module is compatible with the version of OpenBolt it ships with. Targets must have the `openvox-agent` or `puppet-agent` package installed. The CA server must have `puppetserver` available on PATH.
 
+Tasks must run as `root` (or the user that owns the system SSL directory, typically `/etc/puppetlabs/puppet/ssl`). Configure privilege escalation in your inventory:
+
+```yaml
+config:
+  ssh:
+    run-as: root
+```
+
+If tasks run as an unprivileged user, `puppet ssl clean` will clean that user's home-directory ssldir instead of the system ssldir. The old (revoked) certificate in `/etc/puppetlabs/puppet/ssl` will then cause `puppet agent` runs by root to fail with an SSL certificate unknown error.
+
 ## Usage
 
 Regenerate certificates for a single agent:
