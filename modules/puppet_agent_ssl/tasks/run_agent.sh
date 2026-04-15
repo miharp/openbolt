@@ -3,8 +3,6 @@
 # Exit codes 0 (no changes) and 2 (changes applied) are both success.
 # Exit code 4 or 6 indicates resource failures.
 
-set -e
-
 BINARY="${PT_agent_binary:-/opt/puppetlabs/bin/puppet}"
 NOOP="${PT_noop:-false}"
 

@@ -32,30 +32,26 @@
 #   run_plan(puppet_agent_ssl::regenerate, targets => 'agents', ca_server => 'puppet.example.com')
 #
 plan puppet_agent_ssl::regenerate(
-  TargetSpec         $targets,
-  TargetSpec         $ca_server     = 'localhost',
-  String[1]          $agent_binary  = '/opt/puppetlabs/bin/puppet',
-  Boolean            $noop           = false,
-  Boolean            $restart_agent  = false,
+  TargetSpec  $targets,
+  TargetSpec  $ca_server    = 'localhost',
+  String[1]   $agent_binary = '/opt/puppetlabs/bin/puppet',
+  Boolean     $noop         = false,
+  Boolean     $restart_agent = false,
 ) {
   $agents = get_targets($targets)
   $ca     = get_targets($ca_server)[0]
 
   out::message("Regenerating certificates for: ${agents.map |$t| { $t.name }.join(', ')}")
 
-  # ------------------------------------------------------------------
-  # Step 1: Collect certnames before touching any SSL state.
-  # Also collect the CA's own certname and fail early if any agent is
-  # the CA server — regenerating the CA's certificate via this plan
+  # Collect certnames from agents and CA in parallel before touching any SSL
+  # state. Fail early if any agent IS the CA — regenerating the CA's own cert
   # would break puppetserver while it is running.
-  # ------------------------------------------------------------------
-  $certname_results = run_task('puppet_agent_ssl::get_certname', $agents,
+  $all_certname_results = run_task('puppet_agent_ssl::get_certname', $agents + [$ca],
     agent_binary => $agent_binary,
   )
 
-  $ca_certname = run_task('puppet_agent_ssl::get_certname', $ca,
-    agent_binary => $agent_binary,
-  )[0]['certname']
+  $certname_results = $all_certname_results.filter |$r| { $r.target().name != $ca.name }
+  $ca_certname      = ($all_certname_results.filter |$r| { $r.target().name == $ca.name })[0]['certname']
 
   $ca_targets = $certname_results.filter |$r| { $r['certname'] == $ca_certname }
   if $ca_targets.length > 0 {
@@ -68,55 +64,36 @@ Use a dedicated CA cert regeneration procedure instead. Affected targets: ${name
     )
   }
 
-  # ------------------------------------------------------------------
-  # Step 2: Stop the agent service so it does not interfere.
-  # ------------------------------------------------------------------
   run_task('puppet_agent_ssl::stop_agent', $agents)
 
-  # ------------------------------------------------------------------
-  # Steps 3–4: Per-agent: clean local SSL then revoke on CA.
-  # CA clean is best-effort — the cert may not exist if this is a
-  # re-bootstrap of a brand-new node.
-  # ------------------------------------------------------------------
+  # Clean local SSL on all agents in parallel, then revoke each cert on the CA.
+  # CA clean is best-effort — the cert may not exist on a re-bootstrapped node.
+  run_command("${agent_binary} ssl clean", $agents)
+
   $certname_results.each |$result| {
     $certname = $result['certname']
-    $agent    = $result.target()
-
-    out::message("Cleaning SSL for ${certname}")
-
-    run_command("${agent_binary} ssl clean", $agent)
-
+    out::message("Revoking old certificate for ${certname}")
     run_command("puppetserver ca clean --certname ${certname}", $ca,
       { '_catch_errors' => true }
     )
   }
 
-  # ------------------------------------------------------------------
-  # Step 5: Generate a new keypair and submit the CSR on each agent.
-  # The agent exits non-zero because the cert is not yet signed — that
-  # is expected and suppressed via _catch_errors.
-  # ------------------------------------------------------------------
+  # submit_request exits non-zero when the cert is not yet signed — expected.
   run_task('puppet_agent_ssl::submit_csr', $agents,
     agent_binary  => $agent_binary,
     _catch_errors => true,
   )
 
-  # ------------------------------------------------------------------
-  # Step 6: Sign the new certificates on the CA.
-  # ------------------------------------------------------------------
   $certname_results.each |$result| {
     $certname = $result['certname']
     out::message("Signing certificate for ${certname}")
-    # _catch_errors: autosign environments will have already signed the cert
-    # by the time submit_csr returns; the final agent run confirms success.
+    # Autosign environments will have already signed the cert by the time
+    # submit_csr returns; the final agent run confirms success either way.
     run_command("puppetserver ca sign --certname ${certname}", $ca,
       { '_catch_errors' => true }
     )
   }
 
-  # ------------------------------------------------------------------
-  # Step 7: Final agent run to confirm the new certificate works.
-  # ------------------------------------------------------------------
   $final_results = run_task('puppet_agent_ssl::run_agent', $agents,
     agent_binary  => $agent_binary,
     noop          => $noop,
@@ -133,9 +110,6 @@ Use a dedicated CA cert regeneration procedure instead. Affected targets: ${name
     )
   }
 
-  # ------------------------------------------------------------------
-  # Step 8: Optionally re-enable and start the agent service.
-  # ------------------------------------------------------------------
   if $restart_agent {
     run_task('puppet_agent_ssl::start_agent', $agents)
   }
