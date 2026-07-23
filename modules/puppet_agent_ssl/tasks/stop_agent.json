@@ -1,0 +1,8 @@
+{
+  "description": "Stop the Puppet/openvox agent service.",
+  "parameters": {},
+  "implementations": [
+    { "name": "stop_agent.sh",  "requirements": ["shell"] },
+    { "name": "stop_agent.ps1", "requirements": ["powershell"] }
+  ]
+}
