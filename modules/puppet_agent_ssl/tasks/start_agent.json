@@ -1,0 +1,8 @@
+{
+  "description": "Start and enable the Puppet/openvox agent service.",
+  "parameters": {},
+  "implementations": [
+    { "name": "start_agent.sh",  "requirements": ["shell"] },
+    { "name": "start_agent.ps1", "requirements": ["powershell"] }
+  ]
+}

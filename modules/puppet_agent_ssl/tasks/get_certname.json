@@ -1,0 +1,13 @@
+{
+  "description": "Return the configured certname for a Puppet/openvox agent node.",
+  "parameters": {
+    "agent_binary": {
+      "type": "Optional[String[1]]",
+      "description": "Path or name of the agent binary. Defaults to 'puppet'."
+    }
+  },
+  "implementations": [
+    { "name": "get_certname.sh",  "requirements": ["shell"] },
+    { "name": "get_certname.ps1", "requirements": ["powershell"] }
+  ]
+}
